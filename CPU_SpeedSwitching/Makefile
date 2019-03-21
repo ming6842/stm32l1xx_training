@@ -55,7 +55,7 @@ CFLAGS_DEFINE= \
 		-D STM32L1XX_MD \
 #__CC_ARM
 CFLAGS_OPTIMIZE= \
-		-O
+		-O2
 CFLAGS_NEW_LIB_NANO= \
 		--specs=nano.specs --specs=nosys.specs -u _printf_float
 #warning
