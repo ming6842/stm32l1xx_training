@@ -10,7 +10,7 @@
 
 /* Private setup functions ---------------------------------------------------------*/
 void RCC_setup_HSI(void);
-void RCC_setup_MSI(void);
+void RCC_setup_MSI(uint32_t msi_speed);
 
 
 #endif 

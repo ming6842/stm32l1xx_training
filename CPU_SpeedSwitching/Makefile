@@ -21,6 +21,7 @@ SRC+=	./system_stm32l1xx.c \
 		$(ST)/src/stm32l1xx_gpio.c \
 		$(ST)/src/stm32l1xx_usart.c \
 		$(ST)/src/stm32l1xx_spi.c \
+		$(ST)/src/stm32l1xx_pwr.c \
 		$(ST)/src/stm32l1xx_tim.c \
 		$(ST)/src/stm32l1xx_adc.c \
 		$(ST)/src/stm32l1xx_dma.c \
@@ -55,7 +56,7 @@ CFLAGS_DEFINE= \
 		-D STM32L1XX_MD \
 #__CC_ARM
 CFLAGS_OPTIMIZE= \
-		-O2
+		-O
 CFLAGS_NEW_LIB_NANO= \
 		--specs=nano.specs --specs=nosys.specs -u _printf_float
 #warning
@@ -115,6 +116,8 @@ clean:
 #flash:
 #	$(GDB) firmware.elf -x ./bmp_flash.gdb
 
+checksize:
+	arm-none-eabi-size firmware.elf 
 #execute gdbtui
 gdbtui:
 	$(GDB) -tui -x ./openocd_gdb.gdb

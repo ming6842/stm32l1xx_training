@@ -6,7 +6,7 @@ void TIM4_IRQHandler(void){
   {
     TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
 
-    GPIO_ToggleBits(GPIOA,GPIO_Pin_2);
+    GPIO_ToggleBits(GPIOA,GPIO_Pin_4);
 
 
   }
