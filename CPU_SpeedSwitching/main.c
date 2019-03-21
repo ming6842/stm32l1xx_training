@@ -7,6 +7,7 @@
   * @{
   */
 void GPIO_setup(void);
+void Switch_setup(void);//PB5,10
 
 /* Private user define functions ---------------------------------------------------------*/
 void delay(unsigned long ms);
@@ -18,13 +19,20 @@ void delay(unsigned long ms);
 int main(void)
 {
   // RCC_setup_HSI();
-  RCC_setup_MSI(RCC_MSIRange_0);
+  // RCC_setup_MSI(RCC_MSIRange_0);
 
     // RCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);
+  Switch_setup();
+  // RCC_SYSCLKConfig(RCC_SYSCLKSource_MSI);
   SystemCoreClockUpdate();
   // GPIO_setup();
-
-    // PWR_EnterSTANDBYMode();
+  RCC_LSEConfig(RCC_LSE_OFF);
+  RCC_LSICmd(DISABLE);
+    RCC_HSICmd(DISABLE);
+    RCC_HSEConfig(RCC_HSE_OFF);
+    // while(RCC_GetFlagStatus(RCC_FLAG_HSERDY) == SET);
+    // delay(10000);
+    PWR_EnterSTANDBYMode();
     
     // PWR_EnterSTOPMode(PWR_Regulator_LowPower, PWR_STOPEntry_WFI);
   while(1);
@@ -71,6 +79,22 @@ void GPIO_setup(void)
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 
   GPIO_Init(GPIOA, &GPIO_InitStructure);
+}
+void Switch_setup(void)
+{
+  /* GPIO Sturcture */
+  GPIO_InitTypeDef GPIO_InitStructure;
+  /* Enable Peripheral Clock AHB for GPIOB */
+  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB,ENABLE);
+  /* Configure PC13 as Output push-pull */
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5 |GPIO_Pin_10;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
+
+  GPIO_Init(GPIOB, &GPIO_InitStructure);
+    GPIO_ResetBits(GPIOB,GPIO_Pin_5 |GPIO_Pin_10);
+
 }
 // delay 1 ms per count @ Crystal 16.0 MHz 
 void delay(unsigned long ms)
