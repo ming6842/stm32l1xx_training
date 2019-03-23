@@ -6,10 +6,12 @@
 /** @addtogroup Template_Project
   * @{
   */
-void GPIO_setup(void);
-void Switch_setup(void);//PB5,10
-void GoStanbyMode(void);
+
 void RCC_Config(void);
+void USART2_setup(void);
+void RTC_WKUP_IRQHandler(void);
+void EXTI20_Config(void);
+void RTC_Wakeup_Init(void);
 
 
 void usart1_putc(char c);
@@ -24,91 +26,8 @@ void delay(unsigned long ms);
 
 RTC_InitTypeDef   RTC_InitStructure;
 RTC_TimeTypeDef   RTC_TimeStructure;
-
 RTC_AlarmTypeDef  RTC_AlarmStructure;
 
-void GetandSetWakeupAlarm(void){
-
-    RTC_GetTime(RTC_Format_BIN, &RTC_TimeStructure);
-
-    RTC_AlarmStructure.RTC_AlarmTime.RTC_H12     = RTC_TimeStructure.RTC_H12;
-
-    /* Set the alarm X+5s */
-    if(RTC_TimeStructure.RTC_Seconds + 0x5 >=59){
-
-      if(RTC_TimeStructure.RTC_Minutes +1  >=60){
-
-
-        RTC_AlarmStructure.RTC_AlarmTime.RTC_Minutes = 0;
-
-
-        if(RTC_TimeStructure.RTC_Hours +1  >=24){
-
-
-          RTC_AlarmStructure.RTC_AlarmTime.RTC_Hours   = 0;
-        }else{
-
-          RTC_AlarmStructure.RTC_AlarmTime.RTC_Hours   = RTC_TimeStructure.RTC_Hours+1;
-
-        }
-
-
-      }else{
-
-
-        RTC_AlarmStructure.RTC_AlarmTime.RTC_Minutes = RTC_TimeStructure.RTC_Minutes+1;
-      RTC_AlarmStructure.RTC_AlarmTime.RTC_Hours   = RTC_TimeStructure.RTC_Hours;
-
-
-      }
-
-
-    RTC_AlarmStructure.RTC_AlarmTime.RTC_Seconds = 0;
-
-    }else{
-      RTC_AlarmStructure.RTC_AlarmTime.RTC_Minutes = RTC_TimeStructure.RTC_Minutes;
-      RTC_AlarmStructure.RTC_AlarmTime.RTC_Hours   = RTC_TimeStructure.RTC_Hours;
-      RTC_AlarmStructure.RTC_AlarmTime.RTC_Seconds = (RTC_TimeStructure.RTC_Seconds + 0x5) % 60;
-
-    }
-
-
-
-    RTC_AlarmStructure.RTC_AlarmDateWeekDay = 0x31;
-    RTC_AlarmStructure.RTC_AlarmDateWeekDaySel = RTC_AlarmDateWeekDaySel_Date;
-    RTC_AlarmStructure.RTC_AlarmMask = RTC_AlarmMask_DateWeekDay;
-
-
-}
-
-
-
-
-void SetAlarmAndSleep(void){
-   /* Disable the Alarm A */
-    RTC_AlarmCmd(RTC_Alarm_A, DISABLE);
-    
-
-    //* Already set by function above */
-    RTC_SetAlarm(RTC_Format_BIN, RTC_Alarm_A, &RTC_AlarmStructure);
-
-    /* Clear PWR WakeUp flag */
-    PWR_ClearFlag(PWR_FLAG_WU);
-
-    /* Clear RTC Alarm A flag */ 
-    RTC_ClearFlag(RTC_FLAG_ALRAF);
-  
-    /* Enable RTC Alarm A Interrupt: this Interrupt will wake-up the system from
-       STANDBY mode (RTC Alarm IT not enabled in NVIC) */
-    RTC_ITConfig(RTC_IT_ALRA, ENABLE);
-  
-    /* Enable the Alarm A */
-    RTC_AlarmCmd(RTC_Alarm_A, ENABLE);
-    
-    /* Request to enter STANDBY mode */
-    PWR_EnterSTANDBYMode();
-
-}
 
 void USART2_setup(void)
 {
@@ -153,20 +72,57 @@ void usart1_puts(char *s)
   }
 }
 
-void GoStanbyMode(void){
+void RTC_WKUP_IRQHandler(void){
+
+  if(RTC_GetFlagStatus(RTC_FLAG_WUTF) != RESET){
+
+    RTC_ClearFlag(RTC_FLAG_WUTF);
+  }
 
 
-  Switch_setup();
+}
 
-  SystemCoreClockUpdate();
+void EXTI20_Config(void)
+{
+  EXTI_InitTypeDef   EXTI_InitStructure;
+NVIC_InitTypeDef   NVIC_InitStructure;
+  /* Enable SYSCFG clock */
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
 
-  RCC_LSEConfig(RCC_LSE_OFF);
-  RCC_LSICmd(DISABLE);
-  RCC_HSICmd(DISABLE);
-  RCC_HSEConfig(RCC_HSE_OFF);
 
-  PWR_EnterSTANDBYMode();
-    
+  RTC_ITConfig(RTC_IT_WUT,ENABLE);
+
+  /* Configure EXTI0 line */
+  EXTI_InitStructure.EXTI_Line = EXTI_Line20;
+  EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+  EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;  
+  EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+  EXTI_Init(&EXTI_InitStructure);
+
+  // /* Enable and set EXTI0 Interrupt to the lowest priority */
+  NVIC_InitStructure.NVIC_IRQChannel = RTC_WKUP_IRQn;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
+  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+  NVIC_Init(&NVIC_InitStructure);
+}
+
+void RTC_Wakeup_Init(void){
+
+  PWR_ClearFlag(PWR_FLAG_WU);
+  EXTI20_Config();
+  RTC_OutputConfig(RTC_Output_WakeUp, RTC_OutputPolarity_High);
+
+  /* Clear PWR WakeUp flag */
+  PWR_ClearFlag(PWR_FLAG_WU);
+
+  /* Clear RTC Alarm A flag */ 
+  RTC_ClearFlag(RTC_FLAG_WUTF);
+  
+  RTC_WakeUpCmd(DISABLE);
+  RTC_WakeUpClockConfig(RTC_WakeUpClock_CK_SPRE_16bits);
+  RTC_SetWakeUpCounter(30);
+  RTC_WakeUpCmd(ENABLE);
 
 }
 
@@ -176,21 +132,17 @@ int main(void)
   // RCC_setup_HSI();
 
   SystemCoreClockUpdate();
-  delay(50);
-  // RCC_setup_MSI(RCC_MSIRange_0);
+  delay(1);
+
   USART2_setup();
 
 
   usart1_puts("RCC\r\n");
   RCC_Config();
-  /* Enable WKUP pin 1 */
-  // PWR_WakeUpPinCmd(PWR_WakeUpPin_1, ENABLE);  
 
+  RTC_Wakeup_Init();
 
-  // usart1_puts("Delay\r\n");
-  // delay(500);
-  GetandSetWakeupAlarm();
-  usart1_puts("AlamGet\r\n");
+    RTC_GetTime(RTC_Format_BIN, &RTC_TimeStructure);
   sprintf(uart_buffer,"%d:%d:%d Alarm = %d:%d:%d \r\n",RTC_TimeStructure.RTC_Hours,
                                       RTC_TimeStructure.RTC_Minutes, 
                                       RTC_TimeStructure.RTC_Seconds,
@@ -199,7 +151,9 @@ int main(void)
                                       RTC_AlarmStructure.RTC_AlarmTime.RTC_Seconds);
   usart1_puts(uart_buffer);
 
-  SetAlarmAndSleep();
+  // delay(300);
+  PWR_EnterSTANDBYMode();
+
   while(1){
   usart1_puts("Fuck\r\n");
   }
@@ -220,7 +174,7 @@ void RCC_Config(void)
     PWR_ClearFlag(PWR_FLAG_SB);
 
 
-  usart1_puts("C_SB\r\n");
+  // usart1_puts("C_SB\r\n");
     /* Turn on LED2 */
     // STM_EVAL_LEDOn(LED2); ////DO SOMETHING
     
@@ -232,7 +186,7 @@ void RCC_Config(void)
 
     PWR_ClearFlag(PWR_FLAG_WU);
 
-  usart1_puts("C_WU\r\n");
+  // usart1_puts("C_WU\r\n");
     RTC_WaitForSynchro();
 
   }
@@ -243,7 +197,7 @@ void RCC_Config(void)
     RCC_RTCResetCmd(ENABLE);
     RCC_RTCResetCmd(DISABLE);
 
-  usart1_puts("Reset_\r\n");
+  // usart1_puts("Reset_\r\n");
     /* Enable the LSE OSC */
     RCC_LSEConfig(RCC_LSE_ON);
     
@@ -280,37 +234,6 @@ void RCC_Config(void)
   RTC_ClearFlag(RTC_FLAG_ALRAF);
 }
 
-
-void GPIO_setup(void)
-{
-  /* GPIO Sturcture */
-  GPIO_InitTypeDef GPIO_InitStructure;
-  /* Enable Peripheral Clock AHB for GPIOB */
-  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA,ENABLE);
-  /* Configure PC13 as Output push-pull */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 |GPIO_Pin_2|GPIO_Pin_3;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
-}
-void Switch_setup(void)
-{
-  /* GPIO Sturcture */
-  GPIO_InitTypeDef GPIO_InitStructure;
-  /* Enable Peripheral Clock AHB for GPIOB */
-  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOB,ENABLE);
-  /* Configure PC13 as Output push-pull */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5 |GPIO_Pin_10;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
-
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-    GPIO_ResetBits(GPIOB,GPIO_Pin_5 |GPIO_Pin_10);
-
-}
 // delay 1 ms per count @ Crystal 16.0 MHz 
 void delay(unsigned long ms)
 {
